@@ -3,6 +3,8 @@ import { Task, Note, ViewType } from './types';
 import Sidebar from './components/Sidebar';
 import TaskList from './components/TaskList';
 import NoteList from './components/NoteList';
+import AuthForm from './components/AuthForm';
+import { useAuth } from './hooks/useAuth';
 import { supabase } from './supabaseClient';
 
 const initialTasks: Task[] = [
@@ -17,6 +19,7 @@ const initialNotes: Note[] = [
 ];
 
 const App: React.FC = () => {
+    const { user, loading: authLoading, signOut, isAuthenticated } = useAuth();
     const [tasks, setTasks] = useState<Task[]>(() => {
         try {
             const saved = localStorage.getItem('tasks');
@@ -50,6 +53,23 @@ const App: React.FC = () => {
     const isSupabaseEnabled = Boolean(
         (import.meta as any).env?.VITE_SUPABASE_URL && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY
     );
+
+    // Show auth form if Supabase is enabled but user is not authenticated
+    if (isSupabaseEnabled && !authLoading && !isAuthenticated) {
+        return <AuthForm onAuthSuccess={() => {}} />;
+    }
+
+    // Show loading while checking auth
+    if (isSupabaseEnabled && authLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+                    <p className="text-gray-400">Đang tải...</p>
+                </div>
+            </div>
+        );
+    }
 
     // Request notification permission on startup
     useEffect(() => {
@@ -98,7 +118,8 @@ const App: React.FC = () => {
             try {
                 const { data: taskRows, error: taskErr } = await supabase
                     .from('tasks')
-                    .select('id,title,completed,due_date');
+                    .select('id,title,completed,due_date')
+                    .eq('user_id', user?.id);
                 if (taskErr) throw taskErr;
                 if (taskRows) {
                     const loadedTasks: Task[] = taskRows.map((r: any) => ({
@@ -112,7 +133,8 @@ const App: React.FC = () => {
 
                 const { data: noteRows, error: noteErr } = await supabase
                     .from('notes')
-                    .select('id,title,content,last_modified');
+                    .select('id,title,content,last_modified')
+                    .eq('user_id', user?.id);
                 if (noteErr) throw noteErr;
                 if (noteRows) {
                     const loadedNotes: Note[] = noteRows.map((r: any) => ({
@@ -132,16 +154,17 @@ const App: React.FC = () => {
         };
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [user?.id]);
 
     const upsertTaskToSupabase = async (task: Task) => {
-        if (!isSupabaseEnabled) return;
+        if (!isSupabaseEnabled || !isAuthenticated) return;
         try {
-            await supabase.from('tasks').upsert({
+            await supabase!.from('tasks').upsert({
                 id: task.id,
                 title: task.title,
                 completed: task.completed,
                 due_date: task.dueDate ?? null,
+                user_id: user?.id,
             }, { onConflict: 'id' });
         } catch (e) {
             // eslint-disable-next-line no-console
@@ -150,9 +173,9 @@ const App: React.FC = () => {
     };
 
     const deleteTaskFromSupabase = async (id: string) => {
-        if (!isSupabaseEnabled) return;
+        if (!isSupabaseEnabled || !isAuthenticated) return;
         try {
-            await supabase.from('tasks').delete().eq('id', id);
+            await supabase!.from('tasks').delete().eq('id', id).eq('user_id', user?.id);
         } catch (e) {
             // eslint-disable-next-line no-console
             console.error('Failed to delete task', e);
@@ -160,13 +183,14 @@ const App: React.FC = () => {
     };
 
     const upsertNoteToSupabase = async (note: Note) => {
-        if (!isSupabaseEnabled) return;
+        if (!isSupabaseEnabled || !isAuthenticated) return;
         try {
-            await supabase.from('notes').upsert({
+            await supabase!.from('notes').upsert({
                 id: note.id,
                 title: note.title,
                 content: note.content,
                 last_modified: note.lastModified,
+                user_id: user?.id,
             }, { onConflict: 'id' });
         } catch (e) {
             // eslint-disable-next-line no-console
@@ -175,9 +199,9 @@ const App: React.FC = () => {
     };
 
     const deleteNoteFromSupabase = async (id: string) => {
-        if (!isSupabaseEnabled) return;
+        if (!isSupabaseEnabled || !isAuthenticated) return;
         try {
-            await supabase.from('notes').delete().eq('id', id);
+            await supabase!.from('notes').delete().eq('id', id).eq('user_id', user?.id);
         } catch (e) {
             // eslint-disable-next-line no-console
             console.error('Failed to delete note', e);
@@ -296,6 +320,13 @@ const App: React.FC = () => {
             `}</style>
             <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100">
                 <Sidebar activeView={activeView} setActiveView={setActiveView} onNewItem={handleNewItem} />
+                <Sidebar 
+                    activeView={activeView} 
+                    setActiveView={setActiveView} 
+                    onNewItem={handleNewItem}
+                    user={isSupabaseEnabled ? user : null}
+                    onSignOut={signOut}
+                />
                 <main className="flex-1 p-8 ml-64 overflow-y-auto">
                     <div className="flex items-center justify-between mb-8">
                         <div>

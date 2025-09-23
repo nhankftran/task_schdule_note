@@ -1,15 +1,19 @@
 
 import React from 'react';
+import { User } from '@supabase/supabase-js';
 import { TaskIcon, NoteIcon, PlusIcon } from './icons';
+import UserMenu from './UserMenu';
 import { ViewType } from '../types';
 
 interface SidebarProps {
   activeView: ViewType;
   setActiveView: (view: ViewType) => void;
   onNewItem: () => void;
+  user?: User | null;
+  onSignOut?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onNewItem }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onNewItem, user, onSignOut }) => {
   const navItems = [
     { id: 'tasks', label: 'Công việc', icon: <TaskIcon /> },
     { id: 'notes', label: 'Ghi chú', icon: <NoteIcon /> },
@@ -47,6 +51,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onNewItem 
           ))}
         </ul>
       </nav>
+      
+      {user && onSignOut && (
+        <div className="mb-4">
+          <UserMenu user={user} onSignOut={onSignOut} />
+        </div>
+      )}
+      
       <button
         onClick={onNewItem}
         className="w-full bg-gradient-to-r from-teal-600 to-teal-500 text-white p-4 rounded-xl flex items-center justify-center text-lg font-semibold hover:from-teal-500 hover:to-teal-400 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-teal-500 shadow-lg hover:shadow-teal-500/25 transform hover:scale-105"
