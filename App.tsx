@@ -3,7 +3,6 @@ import { Task, Note, ViewType } from './types';
 import Sidebar from './components/Sidebar';
 import TaskList from './components/TaskList';
 import NoteList from './components/NoteList';
-import Modal from './components/Modal';
 import { supabase } from './supabaseClient';
 
 const initialTasks: Task[] = [
@@ -43,10 +42,8 @@ const App: React.FC = () => {
         }
     });
     
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [showInlineForm, setShowInlineForm] = useState(false);
     const [editingItem, setEditingItem] = useState<Task | Note | null>(null);
-
-    const [formState, setFormState] = useState({ title: '', content: '', dueDate: '' });
     const [notifiedTaskIds, setNotifiedTaskIds] = useState<string[]>([]);
     const [supabaseStatus, setSupabaseStatus] = useState<'disabled' | 'ok' | 'error'>('disabled');
 
@@ -187,28 +184,19 @@ const App: React.FC = () => {
         }
     };
 
-    const handleOpenModal = useCallback((item: Task | Note | null) => {
+    const handleEdit = useCallback((item: Task | Note) => {
         setEditingItem(item);
-        let dueDateString = '';
-        if (item && 'dueDate' in item && item.dueDate) {
-            const d = new Date(item.dueDate);
-            const tzOffset = d.getTimezoneOffset() * 60000;
-            const localDate = new Date(d.getTime() - tzOffset);
-            dueDateString = localDate.toISOString().slice(0, 16);
-        }
-
-        setFormState({
-            title: item?.title || '',
-            content: (item as Note)?.content || '',
-            dueDate: dueDateString
-        });
-        setIsModalOpen(true);
+        setShowInlineForm(true);
     }, []);
 
-    const handleCloseModal = useCallback(() => {
-        setIsModalOpen(false);
+    const handleNewItem = useCallback(() => {
         setEditingItem(null);
-        setFormState({ title: '', content: '', dueDate: '' });
+        setShowInlineForm(true);
+    }, []);
+
+    const handleCancelForm = useCallback(() => {
+        setShowInlineForm(false);
+        setEditingItem(null);
     }, []);
 
     const handleToggleTask = (id: string) => {
@@ -237,38 +225,41 @@ const App: React.FC = () => {
         deleteNoteFromSupabase(id);
     };
 
-    const handleSave = () => {
-        if (!formState.title) return;
+    const handleSaveTask = (title: string, dueDate?: string) => {
+        if (!title.trim()) return;
 
-        if (activeView === 'tasks') {
-            const dueDateTimestamp = formState.dueDate ? new Date(formState.dueDate).getTime() : undefined;
-            if (editingItem) {
-                const oldTask = tasks.find(t => t.id === editingItem.id);
-                const nextTasks = tasks.map(t => t.id === editingItem.id ? { ...t, title: formState.title, dueDate: dueDateTimestamp } : t);
-                setTasks(nextTasks);
-                const changed = nextTasks.find(t => t.id === editingItem.id);
-                if (changed) upsertTaskToSupabase(changed);
-                if (oldTask?.dueDate !== dueDateTimestamp) {
-                    setNotifiedTaskIds(prev => prev.filter(taskId => taskId !== editingItem.id));
-                }
-            } else {
-                const newTask: Task = { id: `t${Date.now()}`, title: formState.title, completed: false, dueDate: dueDateTimestamp };
-                setTasks([newTask, ...tasks]);
-                upsertTaskToSupabase(newTask);
+        const dueDateTimestamp = dueDate ? new Date(dueDate).getTime() : undefined;
+        if (editingItem && 'completed' in editingItem) {
+            const oldTask = tasks.find(t => t.id === editingItem.id);
+            const nextTasks = tasks.map(t => t.id === editingItem.id ? { ...t, title, dueDate: dueDateTimestamp } : t);
+            setTasks(nextTasks);
+            const changed = nextTasks.find(t => t.id === editingItem.id);
+            if (changed) upsertTaskToSupabase(changed);
+            if (oldTask?.dueDate !== dueDateTimestamp) {
+                setNotifiedTaskIds(prev => prev.filter(taskId => taskId !== editingItem.id));
             }
         } else {
-            if (editingItem) {
-                const updatedNotes = notes.map(n => n.id === editingItem.id ? { ...n, title: formState.title, content: formState.content, lastModified: Date.now() } : n);
-                setNotes(updatedNotes);
-                const changed = updatedNotes.find(n => n.id === editingItem.id);
-                if (changed) upsertNoteToSupabase(changed);
-            } else {
-                const newNote: Note = { id: `n${Date.now()}`, title: formState.title, content: formState.content, lastModified: Date.now() };
-                setNotes([newNote, ...notes]);
-                upsertNoteToSupabase(newNote);
-            }
+            const newTask: Task = { id: `t${Date.now()}`, title, completed: false, dueDate: dueDateTimestamp };
+            setTasks([newTask, ...tasks]);
+            upsertTaskToSupabase(newTask);
         }
-        handleCloseModal();
+        handleCancelForm();
+    };
+
+    const handleSaveNote = (title: string, content: string) => {
+        if (!title.trim()) return;
+
+        if (editingItem && 'content' in editingItem) {
+            const updatedNotes = notes.map(n => n.id === editingItem.id ? { ...n, title, content, lastModified: Date.now() } : n);
+            setNotes(updatedNotes);
+            const changed = updatedNotes.find(n => n.id === editingItem.id);
+            if (changed) upsertNoteToSupabase(changed);
+        } else {
+            const newNote: Note = { id: `n${Date.now()}`, title, content, lastModified: Date.now() };
+            setNotes([newNote, ...notes]);
+            upsertNoteToSupabase(newNote);
+        }
+        handleCancelForm();
     };
     
     const sortedNotes = [...notes].sort((a, b) => b.lastModified - a.lastModified);
@@ -290,17 +281,44 @@ const App: React.FC = () => {
                     overflow: hidden;
                 }
             `}</style>
-            <div className="flex h-screen bg-gray-900 text-gray-100">
-                <Sidebar activeView={activeView} setActiveView={setActiveView} onNewItem={() => handleOpenModal(null)} />
+            <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100">
+                <Sidebar activeView={activeView} setActiveView={setActiveView} onNewItem={handleNewItem} />
                 <main className="flex-1 p-8 ml-64 overflow-y-auto">
-                    <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-4xl font-bold text-white">{activeView === 'tasks' ? 'Công việc' : 'Ghi chú'}</h1>
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h1 className="text-5xl font-bold text-white mb-2 bg-gradient-to-r from-teal-400 to-blue-500 bg-clip-text text-transparent">
+                                {activeView === 'tasks' ? 'Công việc' : 'Ghi chú'}
+                            </h1>
+                            <p className="text-gray-400 text-lg">
+                                {activeView === 'tasks' 
+                                    ? `${tasks.filter(t => !t.completed).length} việc cần làm, ${tasks.filter(t => t.completed).length} đã hoàn thành`
+                                    : `${notes.length} ghi chú`
+                                }
+                            </p>
+                        </div>
                         <div>
                             {isSupabaseEnabled ? (
                                 supabaseStatus === 'ok' ? (
-                                    <span className="px-3 py-1 rounded-md text-sm bg-emerald-600/20 text-emerald-300 border border-emerald-600/40">Supabase: Connected</span>
+                                    <span className="px-4 py-2 rounded-full text-sm bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-sm">
+                                        <div className="flex items-center">
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full mr-2 animate-pulse"></div>
+                                            Đã kết nối
+                                        </div>
+                                    </span>
                                 ) : supabaseStatus === 'error' ? (
-                                    <span className="px-3 py-1 rounded-md text-sm bg-rose-600/20 text-rose-300 border border-rose-600/40">Supabase: Error</span>
+                                    <span className="px-4 py-2 rounded-full text-sm bg-rose-500/20 text-rose-300 border border-rose-500/30 backdrop-blur-sm">
+                                        <div className="flex items-center">
+                                            <div className="w-2 h-2 bg-rose-400 rounded-full mr-2"></div>
+                        <TaskList 
+                            tasks={tasks} 
+                            onToggle={handleToggleTask} 
+                            onDelete={handleDeleteTask} 
+                            onEdit={handleEdit}
+                            showInlineForm={showInlineForm}
+                            editingItem={editingItem}
+                            onSave={handleSaveItem}
+                            onCancel={handleCancelForm}
+                        />
                                 ) : null
                             ) : (
                                 <span className="px-3 py-1 rounded-md text-sm bg-gray-600/30 text-gray-300 border border-gray-600/40">Supabase: Disabled</span>
@@ -310,56 +328,18 @@ const App: React.FC = () => {
                     {activeView === 'tasks' ? (
                         <TaskList tasks={tasks} onToggle={handleToggleTask} onDelete={handleDeleteTask} onEdit={(task) => handleOpenModal(task)} />
                     ) : (
-                        <NoteList notes={sortedNotes} onDelete={handleDeleteNote} onEdit={(note) => handleOpenModal(note)} />
+                        <NoteList 
+                            notes={sortedNotes} 
+                            onDelete={handleDeleteNote} 
+                            onEdit={handleEdit}
+                            showInlineForm={showInlineForm}
+                            editingItem={editingItem}
+                            onSave={handleSaveItem}
+                            onCancel={handleCancelForm}
+                        />
                     )}
                 </main>
             </div>
-            <Modal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                title={editingItem ? `Chỉnh sửa ${activeView === 'tasks' ? 'Công việc' : 'Ghi chú'}` : `Tạo ${activeView === 'tasks' ? 'Công việc' : 'Ghi chú'} mới`}
-            >
-                <div className="space-y-4">
-                    <input
-                        type="text"
-                        placeholder="Tiêu đề"
-                        value={formState.title}
-                        onChange={(e) => setFormState({ ...formState, title: e.target.value })}
-                        className="w-full bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    />
-                    {activeView === 'notes' && (
-                        <textarea
-                            placeholder="Nội dung"
-                            value={formState.content}
-                            onChange={(e) => setFormState({ ...formState, content: e.target.value })}
-                            rows={6}
-                            className="w-full bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        />
-                    )}
-                    {activeView === 'tasks' && (
-                         <div>
-                            <label htmlFor="dueDate" className="block text-sm font-medium text-gray-300 mb-1 mt-2">
-                                Hạn chót (tùy chọn)
-                            </label>
-                            <input
-                                id="dueDate"
-                                type="datetime-local"
-                                value={formState.dueDate}
-                                onChange={(e) => setFormState({ ...formState, dueDate: e.target.value })}
-                                className="w-full bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            />
-                        </div>
-                    )}
-                    <div className="flex justify-end space-x-3 pt-2">
-                        <button onClick={handleCloseModal} className="px-5 py-2 rounded-md bg-gray-600 hover:bg-gray-500 transition-colors">
-                            Hủy
-                        </button>
-                        <button onClick={handleSave} className="px-5 py-2 rounded-md bg-teal-600 hover:bg-teal-700 transition-colors">
-                            Lưu
-                        </button>
-                    </div>
-                </div>
-            </Modal>
         </>
     );
 };
