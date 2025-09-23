@@ -262,11 +262,12 @@ const App: React.FC = () => {
         handleCancelForm();
     };
 
-    const handleSaveItem = (title: string, contentOrDueDate?: string) => {
+    const handleSaveItem = (data: { title: string; content?: string; dueDate?: string }) => {
+        const { title, content, dueDate } = data;
         if (activeView === 'tasks') {
-            handleSaveTask(title, contentOrDueDate);
+            handleSaveTask(title, dueDate);
         } else {
-            handleSaveNote(title, contentOrDueDate || '');
+            handleSaveNote(title, content || '');
         }
     };
 
