@@ -261,6 +261,18 @@ const App: React.FC = () => {
         }
         handleCancelForm();
     };
+
+    const handleSaveItem = (title: string, contentOrDueDate?: string) => {
+        if (activeView === 'tasks') {
+            handleSaveTask(title, contentOrDueDate);
+        } else {
+            handleSaveNote(title, contentOrDueDate || '');
+        }
+    };
+
+    const handleOpenModal = (item: Task | Note) => {
+        handleEdit(item);
+    };
     
     const sortedNotes = [...notes].sort((a, b) => b.lastModified - a.lastModified);
 
@@ -309,6 +321,16 @@ const App: React.FC = () => {
                                     <span className="px-4 py-2 rounded-full text-sm bg-rose-500/20 text-rose-300 border border-rose-500/30 backdrop-blur-sm">
                                         <div className="flex items-center">
                                             <div className="w-2 h-2 bg-rose-400 rounded-full mr-2"></div>
+                                            Lỗi kết nối
+                                        </div>
+                                    </span>
+                                ) : null
+                            ) : (
+                                <span className="px-3 py-1 rounded-md text-sm bg-gray-600/30 text-gray-300 border border-gray-600/40">Supabase: Disabled</span>
+                            )}
+                        </div>
+                    </div>
+                    {activeView === 'tasks' ? (
                         <TaskList 
                             tasks={tasks} 
                             onToggle={handleToggleTask} 
@@ -319,14 +341,6 @@ const App: React.FC = () => {
                             onSave={handleSaveItem}
                             onCancel={handleCancelForm}
                         />
-                                ) : null
-                            ) : (
-                                <span className="px-3 py-1 rounded-md text-sm bg-gray-600/30 text-gray-300 border border-gray-600/40">Supabase: Disabled</span>
-                            )}
-                        </div>
-                    </div>
-                    {activeView === 'tasks' ? (
-                        <TaskList tasks={tasks} onToggle={handleToggleTask} onDelete={handleDeleteTask} onEdit={(task) => handleOpenModal(task)} />
                     ) : (
                         <NoteList 
                             notes={sortedNotes} 
