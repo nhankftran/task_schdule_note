@@ -324,7 +324,7 @@ const App: React.FC = () => {
                                             Lỗi kết nối
                                         </div>
                                     </span>
-                                ) : null
+                                ) : <></>
                             ) : (
                                 <span className="px-3 py-1 rounded-md text-sm bg-gray-600/30 text-gray-300 border border-gray-600/40">Supabase: Disabled</span>
                             )}
