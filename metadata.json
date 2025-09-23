@@ -1,0 +1,5 @@
+{
+  "name": "Trình quản lý công việc & Ghi chú",
+  "description": "Một ứng dụng desktop trực quan để quản lý công việc và ghi chú cá nhân của bạn. Sắp xếp các nhiệm vụ, ghi lại những ý tưởng và nâng cao năng suất của bạn với một giao diện mượt mà và dễ sử dụng.",
+  "requestFramePermissions": []
+}
