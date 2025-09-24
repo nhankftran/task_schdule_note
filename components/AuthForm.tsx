@@ -57,6 +57,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onAuthSuccess }) => {
         errorMessage = isLogin 
           ? 'Invalid email or password. Please check your credentials and try again.'
           : 'This email may already be registered. Try logging in instead.';
+      } else if (err.message?.includes('over_email_send_rate_limit')) {
+        errorMessage = 'Too many requests. Please wait a moment before trying again to avoid rate limiting.';
+      } else if (err.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please check your email inbox (including spam folder) and click the confirmation link before signing in.';
       } else if (err.message) {
         errorMessage = err.message;
       }
