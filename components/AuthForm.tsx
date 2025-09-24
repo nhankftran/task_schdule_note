@@ -39,14 +39,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ onAuthSuccess }) => {
         });
         if (error) throw error;
       } else {
-        // For signup, we need to handle the case where email confirmation might be required
-        setError('');
-        
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
+          options: {
+            emailRedirectTo: undefined, // Disable email confirmation
+          }
         });
         if (error) throw error;
+        
+        // Show success message for signup
+        setError('Tài khoản đã được tạo thành công! Bạn có thể đăng nhập ngay.');
+        setIsLogin(true); // Switch to login mode
       }
       
       onAuthSuccess();
